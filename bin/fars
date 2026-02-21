@@ -164,121 +164,56 @@ cmd_init() {
     local timestamp
     timestamp="$(TZ=Asia/Shanghai date +"%Y-%m-%dT%H:%M+08:00")"
 
-    # --- Generate config.yaml directly ---
+    # --- Generate config.yaml from template ---
+    # Source: template/.open-fars/config.yaml.example (single source of truth)
+    local config_src="$TEMPLATE_DIR/.open-fars/config.yaml.example"
     local config_file="$target_dir/.open-fars/config.yaml"
-    cat > "$config_file" <<CONFIGEOF
-# ============================================================
-# Open-FARS Project Configuration
-# ============================================================
-# Full Schema: .claude/SPEC.md section 1.5
-# ============================================================
 
-# --- Your Research ---
-project:
-  direction: "${direction}"
-  description: "${description}"
-  target_venue: "${venue}"
-  language: "${language}"
-  communication_language: "${language}"
+    sed \
+        -e "s|{{DIRECTION}}|${direction}|g" \
+        -e "s|{{DESCRIPTION}}|${description}|g" \
+        -e "s|{{VENUE}}|${venue}|g" \
+        -e "s|{{LANGUAGE}}|${language}|g" \
+        -e "s|{{COMPUTE}}|${compute}|g" \
+        "$config_src" > "$config_file"
 
-# --- Literature Survey ---
-survey:
-  min_papers: 50
-  seed_queries:
-${seed_queries_yaml}
-# --- Idea Generation ---
-ideation:
-  min_ideas: 5
-
-# --- Research Plan ---
-plan:
-  max_experiments: 6
-  max_ablations: 5
-
-# --- Paper Writing ---
-writing:
-  template: ""                        # Leave empty to auto-detect from target_venue
-
-# --- Simulated Peer Review ---
-revision:
-  num_simulated_reviewers: 3
-  target_score: 6.0
-  max_revision_rounds: 3
-
-# --- Compute Resources (describe your environment) ---
-compute:
-  gpus: "${compute}"
-  gpu_memory_each: ""
-CONFIGEOF
+    # Replace {{SEED_QUERIES}} placeholder with multiline YAML list
+    # Use a temp file because sed can't reliably insert multiline content
+    local tmpfile
+    tmpfile="$(mktemp)"
+    while IFS= read -r line; do
+        if [[ "$line" == *'{{SEED_QUERIES}}'* ]]; then
+            printf '%s' "$seed_queries_yaml"
+        else
+            printf '%s\n' "$line"
+        fi
+    done < "$config_file" > "$tmpfile"
+    mv "$tmpfile" "$config_file"
 
     echo -e "  ${GREEN}+${NC} config.yaml generated"
 
-    # --- Generate registry.yaml directly ---
+    # --- Generate registry.yaml from template ---
+    # Source: template/.open-fars/meta/registry.yaml.template (single source of truth)
+    local registry_src="$TEMPLATE_DIR/.open-fars/meta/registry.yaml.template"
     local registry_file="$target_dir/.open-fars/meta/registry.yaml"
-    cat > "$registry_file" <<REGISTRYEOF
-# Open-FARS Registry
-# Schema: .claude/SPEC.md
-# All field definitions and update rules in SPEC.md
 
-direction: "${direction}"
-created: "${timestamp}"
-updated: "${timestamp}"
-
-# Pipeline Stage Status
-stages:
-  S1_survey: "pending"
-  S2_ideation: "pending"
-  S3_plan: "pending"
-  S4_assets: "pending"
-  S5_experiment: "pending"
-  S6_writing: "pending"
-  S7_revision: "pending"
-
-# Review Counts (per-stage, for escalation threshold)
-review_counts:
-  S1_survey: 0
-  S2_ideation: 0
-  S3_plan: 0
-  S4_assets: 0
-  S5_experiment: 0
-  S6_writing: 0
-  S7_revision: 0
-
-# Directions Index
-directions:
-  ${direction}:
-    slug: "${direction}"
-    description: "${description}"
-    created: "${timestamp}"
-    survey_count: 0
-    ideation_count: 0
-    projects: []
-
-# Projects Index
-projects: {}
-
-# Reviews Index
-reviews: []
-
-# Degradations
-degradations: []
-REGISTRYEOF
+    sed \
+        -e "s|{{DIRECTION}}|${direction}|g" \
+        -e "s|{{DESCRIPTION}}|${description}|g" \
+        -e "s|{{TIMESTAMP}}|${timestamp}|g" \
+        "$registry_src" > "$registry_file"
 
     echo -e "  ${GREEN}+${NC} registry.yaml generated"
 
     # --- Generate email config.json if email provided ---
     if [ -n "$email" ]; then
+        local email_src="$TEMPLATE_DIR/.claude/skills/email-notify/config.json.example"
         local email_config="$target_dir/.claude/skills/email-notify/config.json"
-        cat > "$email_config" <<EMAILEOF
-{
-  "smtp_host": "smtp.qq.com",
-  "smtp_port": 465,
-  "smtp_user": "$email",
-  "smtp_auth_code": "your-smtp-authorization-code",
-  "recipient": "$email",
-  "sender_name": "Claude Code"
-}
-EMAILEOF
+
+        sed \
+            -e "s|your-email@qq.com|${email}|g" \
+            "$email_src" > "$email_config"
+
         echo -e "  ${GREEN}+${NC} email-notify config.json generated (update smtp_auth_code!)"
     fi
 

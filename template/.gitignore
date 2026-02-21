@@ -1,0 +1,48 @@
+# === Credentials & Secrets ===
+.claude/skills/email-notify/config.json
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+*.egg
+.pytest_cache/
+
+# === Experiment Runtime (large/transient) ===
+# Eval cache DBs (8-12MB each, runtime cache)
+*.db
+# Numpy/Pickle binary arrays (regenerable from experiment code)
+*.npy
+*.pkl
+
+# === LaTeX build artifacts ===
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+
+# === Deprecated backups ===
+.open-fars/_deprecated_*/
+
+# === IDE / OS ===
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# === Jupyter ===
+.ipynb_checkpoints/
+
+# === Model weights (if ever downloaded locally) ===
+*.bin
+*.pt
+*.safetensors
+*.gguf

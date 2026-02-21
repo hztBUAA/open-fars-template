@@ -1,0 +1,8 @@
+{
+  "smtp_host": "smtp.qq.com",
+  "smtp_port": 465,
+  "smtp_user": "your-email@qq.com",
+  "smtp_auth_code": "your-smtp-authorization-code",
+  "recipient": "your-email@qq.com",
+  "sender_name": "Claude Code"
+}

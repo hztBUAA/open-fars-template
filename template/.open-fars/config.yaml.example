@@ -1,0 +1,45 @@
+# ============================================================
+# Open-FARS Project Configuration
+# ============================================================
+# Fill in the fields below to start the research pipeline.
+# Everything else is handled automatically by Claude Code.
+# Full Schema: .claude/SPEC.md section 1.5
+# ============================================================
+
+# --- Your Research ---
+project:
+  direction: "{{DIRECTION}}"
+  description: "{{DESCRIPTION}}"
+  target_venue: "{{VENUE}}"
+  language: "{{LANGUAGE}}"
+  communication_language: "{{LANGUAGE}}"
+
+# --- Literature Survey ---
+survey:
+  min_papers: 50
+  seed_queries:
+{{SEED_QUERIES}}
+
+# --- Idea Generation ---
+ideation:
+  min_ideas: 5
+
+# --- Research Plan ---
+plan:
+  max_experiments: 6
+  max_ablations: 5
+
+# --- Paper Writing ---
+writing:
+  template: ""                        # Leave empty to auto-detect from target_venue
+
+# --- Simulated Peer Review ---
+revision:
+  num_simulated_reviewers: 3
+  target_score: 6.0
+  max_revision_rounds: 3
+
+# --- Compute Resources (describe your environment) ---
+compute:
+  gpus: "{{COMPUTE}}"
+  gpu_memory_each: ""

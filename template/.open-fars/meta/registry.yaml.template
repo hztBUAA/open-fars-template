@@ -1,0 +1,46 @@
+# Open-FARS Registry
+# Schema: .claude/SPEC.md
+# All field definitions and update rules in SPEC.md
+
+direction: "{{DIRECTION}}"
+created: "{{TIMESTAMP}}"
+updated: "{{TIMESTAMP}}"
+
+# Pipeline Stage Status
+stages:
+  S1_survey: "pending"
+  S2_ideation: "pending"
+  S3_plan: "pending"
+  S4_assets: "pending"
+  S5_experiment: "pending"
+  S6_writing: "pending"
+  S7_revision: "pending"
+
+# Review Counts (per-stage, for escalation threshold)
+review_counts:
+  S1_survey: 0
+  S2_ideation: 0
+  S3_plan: 0
+  S4_assets: 0
+  S5_experiment: 0
+  S6_writing: 0
+  S7_revision: 0
+
+# Directions Index
+directions:
+  {{DIRECTION}}:
+    slug: "{{DIRECTION}}"
+    description: "{{DESCRIPTION}}"
+    created: "{{TIMESTAMP}}"
+    survey_count: 0
+    ideation_count: 0
+    projects: []
+
+# Projects Index
+projects: {}
+
+# Reviews Index
+reviews: []
+
+# Degradations
+degradations: []

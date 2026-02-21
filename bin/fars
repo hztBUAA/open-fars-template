@@ -1,0 +1,334 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ============================================================
+# fars — Open-FARS project scaffolding CLI
+# ============================================================
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TEMPLATE_DIR="$(cd "$SCRIPT_DIR/../template" && pwd)"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+usage() {
+    cat <<'EOF'
+Usage: fars <command> [options]
+
+Commands:
+  init [TARGET_DIR]    Scaffold a new Open-FARS research project
+  install              Symlink fars to /usr/local/bin for global access
+
+Examples:
+  fars init                    # Initialize in current directory
+  fars init ~/research/my-proj # Initialize in specified directory
+  fars install                 # Make fars available globally
+EOF
+}
+
+cmd_install() {
+    local link="/usr/local/bin/fars"
+    local target="$SCRIPT_DIR/fars"
+
+    if [ -L "$link" ]; then
+        echo -e "${YELLOW}Symlink already exists: $link -> $(readlink "$link")${NC}"
+        echo -e "Updating to: $target"
+        ln -sf "$target" "$link"
+    else
+        ln -sf "$target" "$link"
+    fi
+    echo -e "${GREEN}Installed: fars -> $target${NC}"
+    echo "You can now run 'fars' from anywhere."
+}
+
+cmd_init() {
+    local target_dir="${1:-.}"
+    target_dir="$(cd "$target_dir" 2>/dev/null && pwd || mkdir -p "$target_dir" && cd "$target_dir" && pwd)"
+
+    echo -e "${BOLD}${CYAN}"
+    echo "  ___  ___  ___ _ __         __  __ _ _ __ ___"
+    echo " / _ \\/ _ \\/ _ \\ '_ \\ _____ / _|/ _\` | '__/ __|"
+    echo "| (_) |  _/  __/ | | |_____| | | (_| | |  \\__ \\"
+    echo " \\___/| |  \\___|_| |_|     |_|  \\__,_|_|  |___/"
+    echo ""
+    echo -e "${NC}"
+    echo -e "${BOLD}Open-FARS Project Scaffolding${NC}"
+    echo -e "Target directory: ${CYAN}$target_dir${NC}"
+    echo ""
+
+    # Guard: check if already initialized
+    if [ -d "$target_dir/.open-fars" ]; then
+        echo -e "${RED}Error: $target_dir/.open-fars already exists.${NC}"
+        echo "This directory appears to already be an Open-FARS project."
+        echo "If you want to re-initialize, remove .open-fars/ first."
+        exit 1
+    fi
+
+    # --- Interactive prompts ---
+    echo -e "${BOLD}--- Project Configuration ---${NC}"
+    echo ""
+
+    # Direction slug
+    while true; do
+        read -rp "$(echo -e "${CYAN}Research direction slug${NC} (e.g. llm-alignment): ")" direction
+        if [[ -n "$direction" && "$direction" =~ ^[a-z0-9][a-z0-9-]*[a-z0-9]$ ]]; then
+            break
+        fi
+        echo -e "${RED}Invalid slug. Use lowercase letters, numbers, and hyphens (e.g. llm-alignment).${NC}"
+    done
+
+    # Description
+    read -rp "$(echo -e "${CYAN}One-line description${NC}: ")" description
+    if [ -z "$description" ]; then
+        description="Research on $direction"
+    fi
+
+    # Target venue
+    read -rp "$(echo -e "${CYAN}Target venue${NC} (e.g. NeurIPS 2026): ")" venue
+    if [ -z "$venue" ]; then
+        venue="TBD"
+    fi
+
+    # Language
+    while true; do
+        read -rp "$(echo -e "${CYAN}Paper language${NC} [en/zh] (default: en): ")" language
+        language="${language:-en}"
+        if [[ "$language" == "en" || "$language" == "zh" ]]; then
+            break
+        fi
+        echo -e "${RED}Please enter 'en' or 'zh'.${NC}"
+    done
+
+    # Seed queries
+    echo -e "${CYAN}Seed queries${NC} (comma-separated search terms or paper titles):"
+    read -rp "> " seed_queries_raw
+    if [ -z "$seed_queries_raw" ]; then
+        seed_queries_raw="$direction"
+    fi
+
+    # Compute description
+    read -rp "$(echo -e "${CYAN}Compute resources${NC} (e.g. 4x NVIDIA A100, leave empty to skip): ")" compute
+    compute="${compute:-}"
+
+    # Email (optional)
+    read -rp "$(echo -e "${CYAN}Notification email${NC} (optional, for email-notify skill): ")" email
+
+    echo ""
+    echo -e "${BOLD}--- Summary ---${NC}"
+    echo -e "  Direction:    ${GREEN}$direction${NC}"
+    echo -e "  Description:  ${GREEN}$description${NC}"
+    echo -e "  Venue:        ${GREEN}$venue${NC}"
+    echo -e "  Language:     ${GREEN}$language${NC}"
+    echo -e "  Seed queries: ${GREEN}$seed_queries_raw${NC}"
+    echo -e "  Compute:      ${GREEN}${compute:-N/A}${NC}"
+    echo -e "  Email:        ${GREEN}${email:-N/A}${NC}"
+    echo ""
+
+    read -rp "Proceed? [Y/n] " confirm
+    confirm="${confirm:-Y}"
+    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+        echo "Aborted."
+        exit 0
+    fi
+
+    echo ""
+    echo -e "${BOLD}Scaffolding project...${NC}"
+
+    # --- Copy template files ---
+    # Use rsync to copy, preserving structure. Fallback to cp -r.
+    if command -v rsync &>/dev/null; then
+        rsync -a "$TEMPLATE_DIR/" "$target_dir/"
+    else
+        cp -r "$TEMPLATE_DIR/." "$target_dir/"
+    fi
+
+    echo -e "  ${GREEN}+${NC} Template files copied"
+
+    # --- Build seed queries YAML ---
+    local seed_queries_yaml=""
+    IFS=',' read -ra queries <<< "$seed_queries_raw"
+    for q in "${queries[@]}"; do
+        q="$(echo "$q" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        if [ -n "$q" ]; then
+            seed_queries_yaml="${seed_queries_yaml}    - \"${q}\"
+"
+        fi
+    done
+
+    # Generate timestamp
+    local timestamp
+    timestamp="$(TZ=Asia/Shanghai date +"%Y-%m-%dT%H:%M+08:00")"
+
+    # --- Generate config.yaml directly ---
+    local config_file="$target_dir/.open-fars/config.yaml"
+    cat > "$config_file" <<CONFIGEOF
+# ============================================================
+# Open-FARS Project Configuration
+# ============================================================
+# Full Schema: .claude/SPEC.md section 1.5
+# ============================================================
+
+# --- Your Research ---
+project:
+  direction: "${direction}"
+  description: "${description}"
+  target_venue: "${venue}"
+  language: "${language}"
+  communication_language: "${language}"
+
+# --- Literature Survey ---
+survey:
+  min_papers: 50
+  seed_queries:
+${seed_queries_yaml}
+# --- Idea Generation ---
+ideation:
+  min_ideas: 5
+
+# --- Research Plan ---
+plan:
+  max_experiments: 6
+  max_ablations: 5
+
+# --- Paper Writing ---
+writing:
+  template: ""                        # Leave empty to auto-detect from target_venue
+
+# --- Simulated Peer Review ---
+revision:
+  num_simulated_reviewers: 3
+  target_score: 6.0
+  max_revision_rounds: 3
+
+# --- Compute Resources (describe your environment) ---
+compute:
+  gpus: "${compute}"
+  gpu_memory_each: ""
+CONFIGEOF
+
+    echo -e "  ${GREEN}+${NC} config.yaml generated"
+
+    # --- Generate registry.yaml directly ---
+    local registry_file="$target_dir/.open-fars/meta/registry.yaml"
+    cat > "$registry_file" <<REGISTRYEOF
+# Open-FARS Registry
+# Schema: .claude/SPEC.md
+# All field definitions and update rules in SPEC.md
+
+direction: "${direction}"
+created: "${timestamp}"
+updated: "${timestamp}"
+
+# Pipeline Stage Status
+stages:
+  S1_survey: "pending"
+  S2_ideation: "pending"
+  S3_plan: "pending"
+  S4_assets: "pending"
+  S5_experiment: "pending"
+  S6_writing: "pending"
+  S7_revision: "pending"
+
+# Review Counts (per-stage, for escalation threshold)
+review_counts:
+  S1_survey: 0
+  S2_ideation: 0
+  S3_plan: 0
+  S4_assets: 0
+  S5_experiment: 0
+  S6_writing: 0
+  S7_revision: 0
+
+# Directions Index
+directions:
+  ${direction}:
+    slug: "${direction}"
+    description: "${description}"
+    created: "${timestamp}"
+    survey_count: 0
+    ideation_count: 0
+    projects: []
+
+# Projects Index
+projects: {}
+
+# Reviews Index
+reviews: []
+
+# Degradations
+degradations: []
+REGISTRYEOF
+
+    echo -e "  ${GREEN}+${NC} registry.yaml generated"
+
+    # --- Generate email config.json if email provided ---
+    if [ -n "$email" ]; then
+        local email_config="$target_dir/.claude/skills/email-notify/config.json"
+        cat > "$email_config" <<EMAILEOF
+{
+  "smtp_host": "smtp.qq.com",
+  "smtp_port": 465,
+  "smtp_user": "$email",
+  "smtp_auth_code": "your-smtp-authorization-code",
+  "recipient": "$email",
+  "sender_name": "Claude Code"
+}
+EMAILEOF
+        echo -e "  ${GREEN}+${NC} email-notify config.json generated (update smtp_auth_code!)"
+    fi
+
+    # --- Git init ---
+    cd "$target_dir"
+    if [ ! -d ".git" ]; then
+        git init -q
+        git config user.name hzt
+        git config user.email 3061613175@qq.com
+        git add -A
+        git commit -q -m "init: scaffold Open-FARS project for $direction"
+        echo -e "  ${GREEN}+${NC} Git repository initialized with initial commit"
+    else
+        echo -e "  ${YELLOW}!${NC} Git repository already exists, skipping git init"
+    fi
+
+    echo ""
+    echo -e "${GREEN}${BOLD}Done!${NC} Project scaffolded at: ${CYAN}$target_dir${NC}"
+    echo ""
+    echo -e "${BOLD}Next steps:${NC}"
+    echo -e "  1. cd $target_dir"
+    echo -e "  2. Review .open-fars/config.yaml and adjust as needed"
+    if [ -n "$email" ]; then
+        echo -e "  3. Update SMTP auth code in .claude/skills/email-notify/config.json"
+        echo -e "  4. Open Claude Code and start the pipeline: \"Start the Open-FARS pipeline\""
+    else
+        echo -e "  3. Open Claude Code and start the pipeline: \"Start the Open-FARS pipeline\""
+    fi
+    echo ""
+}
+
+# --- Main dispatch ---
+case "${1:-}" in
+    init)
+        shift
+        cmd_init "${1:-}"
+        ;;
+    install)
+        cmd_install
+        ;;
+    -h|--help|help)
+        usage
+        ;;
+    "")
+        usage
+        exit 1
+        ;;
+    *)
+        echo -e "${RED}Unknown command: $1${NC}"
+        usage
+        exit 1
+        ;;
+esac

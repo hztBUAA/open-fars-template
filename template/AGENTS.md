@@ -210,6 +210,7 @@ User commands executed in main thread context:
 | `/status` | `status/` | Generate project progress report | `status/` |
 | `/catchup` | `catchup/` | Research onboarding document | `catchup/` |
 | `/email-notify` | `email-notify/` | Send structured notification email | -- |
+| `/drive` | `drive/` | Perpetual project driver — auto-advances pipeline until completion or human decision | `driver-state.yaml` |
 
 ## Data Persistence
 

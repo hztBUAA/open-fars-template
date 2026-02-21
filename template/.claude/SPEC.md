@@ -160,13 +160,13 @@ else:
     config["experiment"]["tasks"] = derived_from_plan
 
 # 规则 2：追加而非替换（对 list 类型）
-# 用户写了 ["ioi", "sentiment"]，S3 plan 建议加 "arithmetic"
-# → 结果是 ["ioi", "sentiment", "arithmetic"]
+# 用户写了 ["task-a", "task-b"]，S3 plan 建议加 "task-c"
+# → 结果是 ["task-a", "task-b", "task-c"]
 
 # 规则 3：每次更新必须添加注释说明来源
 # tasks:                         # [S3-plan] 从研究计划 v1 填充
-#   - "ioi"                      # [user] 用户指定
-#   - "arithmetic"               # [S3-plan] 计划建议
+#   - "task-a"                   # [user] 用户指定
+#   - "task-c"                   # [S3-plan] 计划建议
 
 yaml.dump(config, open(".open-fars/config.yaml", "w"), allow_unicode=True)
 ```
@@ -358,10 +358,7 @@ min_papers = config.get("survey", {}).get("min_papers", 50)  # default: 50
 │       │   └── requirements.txt
 │       ├── experiments/               # S5: 实验结果
 │       │   └── results/
-│       │       ├── e1_landscape/{task}/
-│       │       ├── e2_circuits/{task}/
-│       │       ├── e3_correspondence/{task}/
-│       │       └── e4_sae_distance/{task}/
+│       │       └── e{N}_{name}/{task}/   # 按实验编号和 task 分目录
 │       ├── paper/                     # S6: LaTeX 论文
 │       │   ├── main.tex
 │       │   ├── sections/
@@ -389,15 +386,14 @@ min_papers = config.get("survey", {}).get("min_papers", 50)  # default: 50
 
 | 文件类型 | 命名模式 | 示例 |
 |---------|---------|------|
-| 调研记录 | `{timestamp}_{topic}.md` | `2026-02-21_0158_prompt-landscape.md` |
-| 创意文件 | `idea-{NN}-{slug}.md` | `idea-01-circuit-landscape-correspondence.md` |
-| 计划版本 | `{timestamp}_v{N}.md` | `2026-02-21_0222_v1.md` |
-| Judge 审查 | `{timestamp}_judge_{type}_r{N}.md` | `2026-02-21_1342_judge_paper_review_r1.md` |
-| Audit | `{timestamp}_audit_{scope}.md` | `2026-02-21_1350_audit_plan_vs_actual.md` |
-| 状态报告 | `{timestamp}_status.md` | `2026-02-21_1604_status.md` |
-| 串讲文档 | `{timestamp}_catchup.md` | `2026-02-21_1616_catchup.md` |
-| 实验结果 | `e{N}_results_{timestamp}.json` | `e2_results_2026-02-20_2028.json` |
-| Prompt 语料 | `corpus_{timestamp}.json` | `corpus_2026-02-20_2047.json` |
+| 调研记录 | `{timestamp}_{topic}.md` | `2026-03-01_1400_transformer-scaling.md` |
+| 创意文件 | `idea-{NN}-{slug}.md` | `idea-01-adaptive-routing.md` |
+| 计划版本 | `{timestamp}_v{N}.md` | `2026-03-02_0900_v1.md` |
+| Judge 审查 | `{timestamp}_judge_{type}_r{N}.md` | `2026-03-05_1342_judge_paper_review_r1.md` |
+| Audit | `{timestamp}_audit_{scope}.md` | `2026-03-05_1350_audit_plan_vs_actual.md` |
+| 状态报告 | `{timestamp}_status.md` | `2026-03-06_1604_status.md` |
+| 串讲文档 | `{timestamp}_catchup.md` | `2026-03-06_1616_catchup.md` |
+| 实验结果 | `e{N}_results_{timestamp}.json` | `e2_results_2026-03-10_2028.json` |
 
 ---
 
@@ -464,5 +460,6 @@ degradations:
 | 版本 | 日期 | 变更 |
 |------|------|------|
 | v1 | 2026-02-21 | 初始版本：registry schema, 目录结构, 命名规范, 交互协议 |
-| v2 | 2026-02-21 | 新增 config.yaml schema (§ 1.5), review_counts, 编排阈值从 AGENTS.md 参数化到 config |
+| v2 | 2026-02-21 | 新增 config.yaml schema (§ 1.5), review_counts, 编排阈值参数化到 config |
 | v3 | 2026-02-21 | config.yaml 升级为活文档：字段三分类（🔒/🌱/🤖），Claude 可补充不可覆盖；models 改为 model_discovery；所有字段 optional + academic defaults |
+| v4 | 2026-02-21 | 模板化：移除项目特定内容，泛化为通用 Open-FARS 规范 |
